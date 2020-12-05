@@ -1,4 +1,4 @@
-package com.stellar.muggle.list;
+package com.stellar.muggle.collection;
 
 /**
  * @author firo

@@ -1,6 +1,8 @@
-package com.stellar.muggle.list;
+package com.stellar.muggle.collection;
 
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.RandomAccess;
 
 /**
  * @author firo
@@ -8,7 +10,7 @@ import java.util.Arrays;
  * @date 2020/12/4 15:44
  */
 public class MuggleArrayList<T> extends MuggleAbstractList<T>
-        implements MuggleRandomAccess, java.io.Serializable {
+        implements RandomAccess, Cloneable, java.io.Serializable {
     private static final int DEFAULT_CAPACITY = 10;
     // 用于区分数组列表是通过有参构造函数还是无参构造函数初始化
     private static final Object[] EMPTY_ELEMENT_DATA = {};
@@ -149,20 +151,8 @@ public class MuggleArrayList<T> extends MuggleAbstractList<T>
     }
 
     @Override
-    public MuggleIterator<T> iterator() {
-        return null;
-    }
-
-    private void checkIndex(int index) {
-        if (index >= size) {
-            throw new RuntimeException("Illegal index");
-        }
-    }
-
-    private void checkIndexForAdd(int index) {
-        if (index < 0 || index > size) {
-            throw new RuntimeException("Illegal index");
-        }
+    public Iterator<T> iterator() {
+        return new Itr();
     }
 
     @SuppressWarnings("unchecked")

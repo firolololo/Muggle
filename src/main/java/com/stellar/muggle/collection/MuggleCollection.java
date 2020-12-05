@@ -1,11 +1,11 @@
-package com.stellar.muggle.list;
+package com.stellar.muggle.collection;
 
 /**
  * @author firo
  * @version 1.0
  * @date 2020/12/4 15:01
  */
-public interface MuggleCollection<T> extends MuggleIterable<T> {
+public interface MuggleCollection<T> extends Iterable<T> {
     int size();
     boolean add(T t);
     boolean addAll(MuggleCollection<T> collection);
@@ -15,4 +15,5 @@ public interface MuggleCollection<T> extends MuggleIterable<T> {
     boolean contains(T t);
     boolean containsAll(MuggleCollection<T> collection);
     T[] toArray();
+    void clear();
 }
