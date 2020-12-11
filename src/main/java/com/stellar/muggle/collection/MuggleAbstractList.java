@@ -7,7 +7,7 @@ import java.util.Iterator;
  * @version 1.0
  * @date 2020/12/4 15:45
  */
-public abstract class MuggleAbstractList<T> implements MuggleList<T> {
+public abstract class MuggleAbstractList<T> extends MuggleAbstractCollection<T> implements MuggleList<T> {
     protected transient int modCount = 0;
 
     @Override

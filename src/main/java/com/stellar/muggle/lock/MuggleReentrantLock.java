@@ -25,7 +25,7 @@ public class MuggleReentrantLock implements Lock, java.io.Serializable {
                 return true;
             } else if (getExclusiveOwnerThread() == thread) {
                 int nextc = c + arg;
-                if (nextc < 0) throw new RuntimeException("maximum lock count exceeded");
+                if (nextc < 0) throw new RuntimeException("Maximum lock count exceeded");
                 setState(nextc);
                 return true;
             }
@@ -45,6 +45,12 @@ public class MuggleReentrantLock implements Lock, java.io.Serializable {
                 setState(c);
             }
             return false;
+        }
+
+        protected final boolean isHeldExclusively() {
+            // While we must in general read state before owner,
+            // we don't need to do so to check if current thread is owner
+            return getExclusiveOwnerThread() == Thread.currentThread();
         }
 
         final ConditionObject newCondition() {
@@ -84,7 +90,7 @@ public class MuggleReentrantLock implements Lock, java.io.Serializable {
                 return true;
             } else if (thread == getExclusiveOwnerThread()) {
                 int nextc = c + arg;
-                if (nextc < 0) throw new RuntimeException("maximum lock count exceeded");
+                if (nextc < 0) throw new RuntimeException("Maximum lock count exceeded");
                 setState(nextc);
                 return true;
             }

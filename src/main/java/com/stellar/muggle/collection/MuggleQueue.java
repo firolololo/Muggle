@@ -10,8 +10,6 @@ public interface MuggleQueue<T> extends MuggleCollection<T>{
 
     T poll();
 
-    T pop();
-
     T remove();
 
     T peek();

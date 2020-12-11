@@ -12,6 +12,8 @@ public interface MuggleDeque<T> extends MuggleQueue<T> {
 
     boolean offerLast(T t);
 
+    T pop();
+
     T pollFirst();
 
     T pollLast();

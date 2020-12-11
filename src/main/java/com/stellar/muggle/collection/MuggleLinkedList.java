@@ -280,7 +280,7 @@ public class MuggleLinkedList<T> extends MuggleAbstractList<T> implements Muggle
         public T next() {
             checkForComodification();
             final Node<T> cur = cursor;
-            if (cur == null) throw new RuntimeException("NoSuchElementException");
+            if (cur == null) throw new RuntimeException("No element");
             lastRet = cur;
             cursor = cur.next;
             return cur.item;
