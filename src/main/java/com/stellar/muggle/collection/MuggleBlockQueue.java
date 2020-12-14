@@ -11,9 +11,9 @@ import java.util.concurrent.TimeUnit;
 public interface MuggleBlockQueue<T> extends MuggleQueue<T> {
     boolean offer(T t);
     T poll();
-    void put(T t);
+    void put(T t) throws InterruptedException;
     T take() throws InterruptedException;
-    boolean offer(T t, long timeout, TimeUnit unit);
+    boolean offer(T t, long timeout, TimeUnit unit) throws InterruptedException;
     T poll(long timeout, TimeUnit unit) throws InterruptedException;
     int drainTo(MuggleCollection<? super T> c);
 }
