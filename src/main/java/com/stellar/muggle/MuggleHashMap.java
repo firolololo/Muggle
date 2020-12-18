@@ -205,6 +205,42 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         threshold = newThr;
         @SuppressWarnings("unchecked")
         Node<K, V>[] newTab = (Node<K, V>[])new Node[newCap];
+        if (oldTab != null) {
+            for (int i = 0; i < oldTab.length; i++) {
+                Node<K, V> e;
+                if ((e = oldTab[i]) != null) {
+                    if (e.next == null) {
+                        newTab[e.hash & (newCap - 1)] = e;
+                    } else {
+                        Node<K, V> loHead = null, loTail = null;
+                        Node<K, V> hiHead = null, hiTail = null;
+                        Node<K, V> next;
+                        do {
+                             next = e.next;
+                            if ((e.hash & oldCap) == 0) {
+                                if (loHead == null)
+                                    loTail = loHead = e;
+                                else
+                                    loTail = loTail.next = e;
+                            } else {
+                                if (hiHead == null)
+                                    hiTail = hiHead = e;
+                                else
+                                    hiTail = hiTail.next = e;
+                            }
+                        } while ((e = next) != null);
+                        if (loHead != null) {
+                            loTail.next = null;
+                            newTab[i] = loHead;
+                        }
+                        if (hiHead != null) {
+                            hiTail.next = null;
+                            newTab[i + oldCap] = hiHead;
+                        }
+                    }
+                }
+            }
+        }
         return newTab;
     }
 }
