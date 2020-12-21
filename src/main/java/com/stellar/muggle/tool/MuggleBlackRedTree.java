@@ -22,12 +22,18 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
     public MuggleBlackRedTree() {}
 
     public void put(T t) {
+        checkNull(t);
         TreeNode<T> x = insert(t);
         if (x != null) balanceInsertion(x);
     }
 
     public void remove(T t) {
+        checkNull(t);
         delete(t);
+    }
+
+    public void printTree() {
+        this.printTree("", root, false);
     }
 
     private TreeNode<T> insert(T t) {
@@ -38,8 +44,8 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
             TreeNode<T> p = root;
             for (;;) {
                 T value = p.value;
-                if (value.compareTo(t) == 0) return null;
-                if (value.compareTo(t) < 0) {
+                if (t.compareTo(value) == 0) return null;
+                if (t.compareTo(value) < 0) {
                     if (p.left == null) {
                         TreeNode<T> x = new TreeNode<>(t);
                         p.left = x; x.parent = p;
@@ -106,8 +112,8 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
         if (root == null) return null;
         TreeNode<T> p = root;
         while (p != null) {
-            if (p.value.compareTo(t) == 0) return p;
-            if (p.value.compareTo(t) < 0) {
+            if (t.compareTo(p.value) == 0) return p;
+            if (t.compareTo(p.value) < 0) {
                 p = p.left;
             } else {
                 p = p.right;
@@ -118,34 +124,40 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
 
     private void rotateRight(TreeNode<T> x) {
         TreeNode<T> xp, xl, xlr;
+        if ((xl = x.left) == null) return;
+        x.left = null;
+        xlr = xl.right;
         if ((xp = x.parent) != null) {
-            if ((xl = x.left) == null) return;
-            xlr = xl.right;
             if (x == xp.left) {
                 xp.left = xl;
             } else {
                 xp.right = xl;
             }
-            xl.right = x;
-            xl.parent = xp;
-            if (xlr != null) x.left = xlr;
         }
+        xl.right = x;
+        x.parent = xl;
+        xl.parent = xp;
+        if (xp == null) root = xl;
+        if (xlr != null) x.left = xlr;
     }
 
     private void rotateLeft(TreeNode<T> x) {
         TreeNode<T> xp, xr, xrl;
+        if ((xr = x.right) == null) return;
+        x.right = null;
+        xrl = xr.left;
         if ((xp = x.parent) != null) {
-            if ((xr = x.right) == null) return;
-            xrl = xr.left;
             if (x == xp.left) {
                 xp.left = xr;
             } else {
                 xp.right = xr;
             }
-            xr.left = x;
-            xr.parent = xp;
-            if (xrl != null) x.right = xrl;
         }
+        xr.left = x;
+        x.parent = xr;
+        xr.parent = xp;
+        if (xp == null) root = xr;
+        if (xrl != null) x.right = xrl;
     }
 
     private void balanceInsertion(TreeNode<T> x) {
@@ -167,11 +179,11 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
                         x = xpp;
                     } else {
                         if (x == xp.right) {
-                            rotateLeft(x);
+                            rotateLeft(xp);
                             x = x.left;
                             xp = x.parent;
                         }
-                        rotateRight(xp);
+                        rotateRight(xpp);
                         xp.red = false;
                         xp.left.red = xp.right.red = true;
                     }
@@ -182,11 +194,11 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
                         x = xpp;
                     } else {
                         if (x == xp.left) {
-                            rotateRight(x);
+                            rotateRight(xp);
                             x = x.right;
                             xp = x.parent;
                         }
-                        rotateLeft(xp);
+                        rotateLeft(xpp);
                         xp.red = false;
                         xp.left.red = xp.right.red = true;
                     }
@@ -207,8 +219,10 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
             } else {
                 if (x == xp.left) {
                     if ((s = xp.right) != null && s.red) {
+                        s.red = false;
+                        xp.red = true;
                         rotateLeft(xp);
-                        x = xp; xp = x.parent;
+                        xp = x.parent;
                         s = (xp == null) ? null : xp.right;
                     }
                     if (s == null) {
@@ -237,8 +251,10 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
                     }
                 } else {
                     if ((s = xp.left) != null && s.red) {
+                        s.red = false;
+                        xp.red = true;
                         rotateRight(xp);
-                        x = xp; xp = x.parent;
+                        xp = x.parent;
                         s = (xp == null) ? null : xp.left;
                     }
                     if (s == null) {
@@ -253,7 +269,7 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
                                 sr.red = false;
                                 s.red = true;
                                 rotateLeft(s);
-                                s = xp.right;
+                                s = xp.left;
                                 sl = (s == null) ? null : s.left;
                             }
                             if (s != null) {
@@ -268,5 +284,17 @@ public class MuggleBlackRedTree<T extends Comparable<T>> {
                 }
             }
         }
+    }
+
+    private void printTree(String prefix, TreeNode<T> node, boolean isLeft) {
+        if (node != null) {
+            System.out.println(prefix + (isLeft ? "|--" : "\\--") + node.value + "(" + (node.red ? "red" : "black") + ")");
+            printTree(prefix + (isLeft ? "|   " : "    "), node.left, true);
+            printTree(prefix + (isLeft ? "|   " : "    "), node.right, false);
+        }
+    }
+
+    private void checkNull(T t) {
+        if (t == null) throw new RuntimeException("Tree node can't be null");
     }
 }

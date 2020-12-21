@@ -5,6 +5,8 @@ import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -19,8 +21,15 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
     static final int DEFAULT_INIT_CAPACITY = 16;
     static final int MAXIMUM_CAPACITY = 1 << 30;
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
-    static final int TREEIFY_THRESHOLD = 8;
-    static final int UNTREEIFY_THRESHOLD = 6;
+    private static int RESIZE_STAMP_BITS = 16;
+    private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS) - 1);
+    private static final int RESIZE_STAMP_SHIFT = 32 - RESIZE_STAMP_BITS;
+
+    static final int MOVED = -1;
+    static final int RESERVED = -3;
+    static final int HASH_BITS = 0x7fffffff;
+    private static final int MIN_TRANSFER_STRIDE = 16;
+    static final int NCPU = Runtime.getRuntime().availableProcessors();
 
     static class Node<K,V> implements Map.Entry<K,V> {
         int hash;
@@ -68,13 +77,16 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
             return false;
         }
     }
+    transient volatile Node<K, V>[] table;
+    transient volatile Node<K,V>[] nextTable;
 
-    transient Node<K, V>[] table;
     int threshold;
     final float loadFactor;
     transient Set<Map.Entry<K,V>> entrySet;
-    transient int size;
-    transient int modCount;
+
+    transient volatile int sizeCtl;
+    transient volatile AtomicInteger size;
+    transient volatile int transferIndex;
 
     public MuggleHashMap() {
         loadFactor = DEFAULT_LOAD_FACTOR;
@@ -92,6 +104,23 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
 
     public MuggleHashMap(int initCapacity) {
         this(initCapacity, DEFAULT_LOAD_FACTOR);
+    }
+
+    static int spread(int h) {
+        return (h ^ (h >>> 16)) & HASH_BITS;
+    }
+
+    @SuppressWarnings("unchecked")
+    static <K,V> Node<K,V> tabAt(Node<K,V>[] tab, int i) {
+        return (Node<K,V>)U.getObjectVolatile(tab, ((long)i << ASHIFT) + ABASE);
+    }
+
+    static <K,V> boolean casTabAt(Node<K,V>[] tab, int i, Node<K,V> c, Node<K,V> v) {
+        return U.compareAndSwapObject(tab, ((long)i << ASHIFT) + ABASE, c, v);
+    }
+
+    static <K,V> void setTabAt(Node<K,V>[] tab, int i, Node<K,V> v) {
+        U.putObjectVolatile(tab, ((long)i << ASHIFT) + ABASE, v);
     }
 
     @Override
@@ -155,19 +184,56 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
     }
 
     public V put(K key, V value) {
+
+
         return null;
     }
 
-    final V putVal(int hash, K key, V value) {
-        Node<K, V>[] tab;
-        Node<K, V> p;
-        int n, i;
+    final V putVal(K key, V value) {
+        int hash = spread(key.hashCode());
+        for (Node<K, V>[] tab = table;;) {
+            Node<K, V> f;
+            int n, i, fh;
+            if (tab == null || (n = tab.length) == 0) {
+                table = initTable();
+            } else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                if (casTabAt(tab, i, null, new Node<K, V>(hash, key, value, null))) break;
+            } else if ((fh = f.hash) == MOVED) {
+                tab = helpTransfer(tab, f);
+            } else {
+                synchronized (f) {
+
+                }
+            }
+        }
         return null;
     }
 
     private int hash(Object key) {
         int h;
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+    }
+
+    private final Node<K, V>[] initTable() {
+        Node<K,V>[] tab; int sc;
+        while ((tab = table) == null || tab.length == 0) {
+            if ((sc = sizeCtl) < 0)
+                Thread.yield();
+            else if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
+                try {
+                    if ((tab = table) == null || tab.length == 0) {
+                        int n = (sc > 0) ? sc : DEFAULT_INIT_CAPACITY;
+                        @SuppressWarnings("unchecked")
+                        Node<K, V>[] nt = (Node<K,V>[])new Node<?,?>[n];
+                        table = tab = nt;
+                    }
+                } finally {
+                    sizeCtl = sc;
+                }
+            }
+            break;
+        }
+        return tab;
     }
 
     private int tableSizeFor(int cap) {
@@ -178,6 +244,10 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         n |= n >> 8;
         n |= n >> 16;
         return n < 0 ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+    }
+
+    private Node<K, V>[] helpTransfer(Node<K, V>[] tab, Node<K, V> f) {
+        return null;
     }
 
     private Node<K, V>[] resize() {
@@ -243,4 +313,31 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         }
         return newTab;
     }
+
+    private static final sun.misc.Unsafe U;
+    private static final long SIZECTL;
+    private static final long TRANSFERINDEX;
+    private static final long ABASE;
+    private static final int ASHIFT;
+
+    static {
+        try {
+            U = sun.misc.Unsafe.getUnsafe();
+            Class<?> k = MuggleHashMap.class;
+            SIZECTL = U.objectFieldOffset
+                    (k.getDeclaredField("sizeCtl"));
+            TRANSFERINDEX = U.objectFieldOffset
+                    (k.getDeclaredField("transferIndex"));
+            Class<?> ak = Node[].class;
+            ABASE = U.arrayBaseOffset(ak);
+            int scale = U.arrayIndexScale(ak);
+            if ((scale & (scale - 1)) != 0)
+                throw new Error("data type scale not a power of two");
+            ASHIFT = 31 - Integer.numberOfLeadingZeros(scale);
+
+        } catch (Exception e) {
+            throw new Error(e);
+        }
+    }
+
 }
