@@ -5,8 +5,7 @@ import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -85,7 +84,8 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
     transient Set<Map.Entry<K,V>> entrySet;
 
     transient volatile int sizeCtl;
-    transient volatile AtomicInteger size;
+    transient volatile int resizerCtl;
+    transient volatile LongAdder size;
     transient volatile int transferIndex;
 
     public MuggleHashMap() {
@@ -202,7 +202,21 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
                 tab = helpTransfer(tab, f);
             } else {
                 synchronized (f) {
-
+                    if (tabAt(tab, i) == f) {
+                        if (fh >= 0) {
+                            for (Node<K, V> e = f;;) {
+                                if (e.hash == hash && e.key.equals(key)) {
+                                    e.value = value;
+                                    break;
+                                }
+                                if (e.next == null) {
+                                    e.next = new Node<>(hash, key, value, null);
+                                    break;
+                                }
+                                e = e.next;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -213,7 +227,7 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         int h;
         return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
-
+    
     private final Node<K, V>[] initTable() {
         Node<K,V>[] tab; int sc;
         while ((tab = table) == null || tab.length == 0) {
@@ -248,6 +262,10 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
 
     private Node<K, V>[] helpTransfer(Node<K, V>[] tab, Node<K, V> f) {
         return null;
+    }
+
+    private void Transfer(Node<K, V>[] tab, Node<K, V>[] nextTab) {
+
     }
 
     private Node<K, V>[] resize() {
@@ -314,8 +332,32 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         return newTab;
     }
 
+    private void addCount(long x) {
+        size.add(x);
+        long count = size.sum();
+        while (count >= sizeCtl) {
+            int ct = sizeCtl;
+            if (ct >= 0 && U.compareAndSwapInt(this, SIZECTL, ct, -1)) {
+                resizerCtl = 1;
+                Transfer(table, null);
+            } else {
+                if (ct < 0 && nextTable != null) {
+                    for (;;) {
+                        int rs = resizerCtl;
+                        if (rs == 0) break;
+                        if (U.compareAndSwapInt(this, RESIZERCTL, rs, rs + 1)) {
+                            Transfer(table, nextTable);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private static final sun.misc.Unsafe U;
     private static final long SIZECTL;
+    private static final long RESIZERCTL;
     private static final long TRANSFERINDEX;
     private static final long ABASE;
     private static final int ASHIFT;
@@ -324,8 +366,8 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
         try {
             U = sun.misc.Unsafe.getUnsafe();
             Class<?> k = MuggleHashMap.class;
-            SIZECTL = U.objectFieldOffset
-                    (k.getDeclaredField("sizeCtl"));
+            SIZECTL = U.objectFieldOffset(k.getDeclaredField("sizeCtl"));
+            RESIZERCTL = U.objectFieldOffset(k.getDeclaredField("resizerCtl"));
             TRANSFERINDEX = U.objectFieldOffset
                     (k.getDeclaredField("transferIndex"));
             Class<?> ak = Node[].class;
@@ -334,7 +376,6 @@ public class MuggleHashMap<K,V> extends AbstractMap<K,V>
             if ((scale & (scale - 1)) != 0)
                 throw new Error("data type scale not a power of two");
             ASHIFT = 31 - Integer.numberOfLeadingZeros(scale);
-
         } catch (Exception e) {
             throw new Error(e);
         }
